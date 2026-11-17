@@ -1,0 +1,16 @@
+{
+  "built_by": "tools/build.mjs",
+  "files": [
+    "agents-peer/agent-manifest.json",
+    "agents-peer/gudang.network.json",
+    "agents-peer/harga-pemasok.json",
+    "agents-peer/links.json",
+    "agents/agent-manifest.json",
+    "agents/links.json",
+    "agents/warung.network.json",
+    "index.html",
+    "runtime.js",
+    "styles.css"
+  ],
+  "profile": "worldwide-agentic-web-mvp-0.2"
+}

@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Warung Agent — Situs Agen Terbuka</title>
+<meta name="description" content="Situs agen terbuka untuk warung/toko kelontong: jaringan agen yang berjalan di browser, sesuai Spesifikasi Minimum Worldwide Agentic Web MVP Profile 0.2.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site-header">
+  <div>
+    <h1>Warung Agent</h1>
+    <p class="tagline">Situs agen terbuka untuk warung / toko kelontong — agen berjalan di browser, tanpa server, tanpa kunci.</p>
+  </div>
+  <p class="profile-badge">MVP Profile 0.2 · Open Agentic Web Challenge</p>
+</header>
+
+<main class="layout">
+  <section class="chat-card" aria-label="Percakapan dengan agen">
+    <h2>Ngobrol dengan Pelayan</h2>
+    <p class="hint">Tanya harga, stok, promo, atau laporan — contoh: “2 mie instan dan 1 teh botol, bayar 50000” atau “berapa stok gula?”</p>
+    <div id="messages" class="messages" aria-live="polite"></div>
+    <form id="chat-form" class="chat-form">
+      <label class="visually-hidden" for="chat-input">Pesan untuk agen</label>
+      <input id="chat-input" type="text" autocomplete="off" placeholder="Tulis pesanmu di sini…" required>
+      <button type="submit">Kirim</button>
+    </form>
+    <div class="examples">
+      <button type="button" data-example="2 mie instan dan 1 teh botol, bayar 50000">Hitung total</button>
+      <button type="button" data-example="berapa stok gula?">Cek stok</button>
+      <button type="button" data-example="saran promo">Saran promo</button>
+      <button type="button" data-example="laporan hari ini">Laporan harian</button>
+      <button type="button" data-example="harga beli minyak dari pemasok?">Harga pemasok</button>
+    </div>
+    <p id="chat-status" class="status" role="status"></p>
+  </section>
+
+  <aside class="panels">
+    <section class="panel" aria-label="Jaringan agen">
+      <h2>Jaringan Agen</h2>
+      <p class="hint">Dibaca langsung dari <code>agents/warung.network.json</code>.</p>
+      <div id="network-graph" class="network-graph"><p class="status">Memuat…</p></div>
+    </section>
+
+    <section class="panel" aria-label="Buku stok">
+      <h2>Buku Stok Warung</h2>
+      <p class="hint">Data demo tersimpan di browsermu (localStorage). Ubah lewat percakapan.</p>
+      <table id="ledger-table" class="ledger">
+        <thead><tr><th>Barang</th><th>Harga</th><th>Stok</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <button type="button" id="reset-data" class="secondary">Reset data demo</button>
+    </section>
+
+    <section class="panel" aria-label="Router dan BYOK">
+      <h2>Router &amp; BYOK</h2>
+      <p class="hint">Bawaan: router lokal deterministik (offline, tanpa kunci). BYOK: sambungkan router OpenAI-compatible milikmu sendiri — kunci hanya tersimpan di browsermu.</p>
+      <div class="radio-row">
+        <label><input type="radio" name="router-mode" value="local" checked> Lokal deterministik</label>
+        <label><input type="radio" name="router-mode" value="byok"> BYOK (kunci sendiri)</label>
+      </div>
+      <div id="byok-fields" class="byok-fields" hidden>
+        <label>Base URL router
+          <input id="byok-base-url" type="url" value="https://api.openai.com/v1" spellcheck="false">
+        </label>
+        <label>Model
+          <input id="byok-model" type="text" value="gpt-4o-mini" spellcheck="false">
+        </label>
+        <label>Kunci API (hanya di browser ini)
+          <input id="byok-key" type="password" autocomplete="off" placeholder="sk-…">
+        </label>
+        <div class="button-row">
+          <button type="button" id="byok-save">Simpan kunci</button>
+          <button type="button" id="byok-delete" class="secondary">Hapus kunci</button>
+        </div>
+      </div>
+      <p id="router-status" class="status" role="status">Router: lokal deterministik.</p>
+    </section>
+
+    <section class="panel" aria-label="Jaringan peer">
+      <h2>Jaringan Peer</h2>
+      <p class="hint">Muat jaringan agen dari situs lain dan jalankan di browser ini. Setiap kontak ke origin lain minta persetujuanmu dulu; kunci router tidak pernah dikirim ke peer.</p>
+      <label>URL jaringan peer
+        <input id="peer-url" type="url" spellcheck="false" placeholder="https://contoh.id/agents-peer/gudang">
+      </label>
+      <div class="button-row">
+        <button type="button" id="peer-load">Muat jaringan peer</button>
+      </div>
+      <p id="peer-status" class="status" role="status">Belum ada jaringan peer yang dimuat.</p>
+      <ul id="peer-list" class="peer-list"></ul>
+    </section>
+
+    <section class="panel" aria-label="Jejak eksekusi">
+      <h2>Jejak Eksekusi</h2>
+      <p class="hint">Langkah router, delegasi, aksi, persetujuan, dan error — tanpa rahasia apa pun.</p>
+      <ol id="trace-log" class="trace-log"></ol>
+      <button type="button" id="trace-clear" class="secondary">Bersihkan jejak</button>
+    </section>
+
+    <section class="panel" aria-label="Kesesuaian spesifikasi">
+      <h2>Kesesuaian Spesifikasi</h2>
+      <p id="conformance-status" class="status">Memeriksa…</p>
+      <ul class="file-links">
+        <li><a href="agents/agent-manifest.json">agents/agent-manifest.json</a></li>
+        <li><a href="agents/warung.network.json">agents/warung.network.json</a></li>
+        <li><a href="agents/links.json">agents/links.json</a></li>
+        <li><a href="agents-peer/agent-manifest.json">agents-peer/agent-manifest.json</a></li>
+        <li><a href="agents-peer/gudang.network.json">agents-peer/gudang.network.json</a></li>
+        <li><a href="agents-peer/harga-pemasok.json">agents-peer/harga-pemasok.json</a></li>
+      </ul>
+      <p class="hint">Kode sumber terbuka (MIT): lihat repositori proyek pada halaman pengiriman Devpost.</p>
+    </section>
+  </aside>
+</main>
+
+<footer class="site-footer">
+  <p>Warung Agent v1.0.0 · Sesuai Spesifikasi Minimum Worldwide Agentic Web, MVP Profile 0.2 (Cognizant AI Lab, 6 Nov 2026) · Lisensi MIT · Dibangun dengan HTML/CSS/JavaScript vanilla — tanpa dependensi, tanpa panggilan jaringan kecuali router BYOK dan peer yang kamu setujui.</p>
+</footer>
+
+<div id="confirm-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+  <div class="modal-box">
+    <h2 id="confirm-title">Konfirmasi aksi tulis</h2>
+    <p id="confirm-text" class="modal-text"></p>
+    <div class="button-row">
+      <button type="button" id="confirm-yes">Konfirmasi</button>
+      <button type="button" id="confirm-no" class="secondary">Batal</button>
+    </div>
+  </div>
+</div>
+
+<div id="consent-modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="consent-title">
+  <div class="modal-box">
+    <h2 id="consent-title">Persetujuan kontak peer</h2>
+    <p id="consent-text" class="modal-text"></p>
+    <p class="hint">Persetujuan ini hanya berlaku untuk origin tersebut dan hanya selama sesi ini. Kunci router kamu tidak akan dikirim ke situs peer.</p>
+    <div class="button-row">
+      <button type="button" id="consent-yes">Saya setuju</button>
+      <button type="button" id="consent-no" class="secondary">Tolak</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { AgenticRuntime, createBrowserStore, formatAnswer, formatRupiah } from "./runtime.js";
+
+const $ = (id) => document.getElementById(id);
+const messagesEl = $("messages");
+const traceEl = $("trace-log");
+const chatStatus = $("chat-status");
+
+function addMessage(text, kind) {
+  const div = document.createElement("div");
+  div.className = `message ${kind || "agent"}`;
+  div.textContent = text;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function addTrace(step) {
+  const li = document.createElement("li");
+  li.textContent = `#${step.n} [${step.kind}] ${step.text}`;
+  traceEl.appendChild(li);
+}
+
+function showModal(id) { $(id).hidden = false; }
+function hideModal(id) { $(id).hidden = true; }
+
+// Modal konfirmasi: resolve(true/false) sekali.
+function askConfirm(text) {
+  $("confirm-text").textContent = text;
+  showModal("confirm-modal");
+  return new Promise((resolve) => {
+    const done = (v) => {
+      hideModal("confirm-modal");
+      $("confirm-yes").onclick = null;
+      $("confirm-no").onclick = null;
+      resolve(v);
+    };
+    $("confirm-yes").onclick = () => done(true);
+    $("confirm-no").onclick = () => done(false);
+  });
+}
+
+function askConsent(info) {
+  $("consent-text").textContent =
+    `Muat jaringan peer dari ${info.origin} untuk: ${info.purpose}. ` +
+    `URL: ${info.url}`;
+  showModal("consent-modal");
+  return new Promise((resolve) => {
+    const done = (v) => {
+      hideModal("consent-modal");
+      $("consent-yes").onclick = null;
+      $("consent-no").onclick = null;
+      resolve(v);
+    };
+    $("consent-yes").onclick = () => done(true);
+    $("consent-no").onclick = () => done(false);
+  });
+}
+
+const store = createBrowserStore("warung-agent-v1");
+let rt = null;
+let pendingConfirmation = null;
+let busy = false;
+
+function refreshLedger() {
+  const tbody = document.querySelector("#ledger-table tbody");
+  tbody.textContent = "";
+  const items = [...store.getState().inventory].sort((a, b) => (a.nama < b.nama ? -1 : 1));
+  for (const it of items) {
+    const tr = document.createElement("tr");
+    const tdName = document.createElement("td"); tdName.textContent = it.nama;
+    const tdPrice = document.createElement("td"); tdPrice.textContent = formatRupiah(it.harga);
+    const tdStock = document.createElement("td"); tdStock.textContent = String(it.stok);
+    if (it.stok < 5) tdStock.className = "low";
+    tr.append(tdName, tdPrice, tdStock);
+    tbody.appendChild(tr);
+  }
+}
+
+function renderNetwork() {
+  const host = $("network-graph");
+  host.textContent = "";
+  if (!rt || !rt.network) { host.textContent = "Jaringan belum dimuat."; return; }
+  const actionNames = new Set((rt.manifest.actions?.catalog || []).map((a) => a.name));
+  const peerNames = new Set(Object.keys((rt.links.networks?.[rt.manifest.networks[0].name]) || {}));
+  for (const agent of rt.network.tools) {
+    const card = document.createElement("div");
+    card.className = "agent-card";
+    if (agent.name === rt.frontAgent) card.classList.add("front");
+    const title = document.createElement("strong");
+    title.textContent = agent.name + (agent.name === rt.frontAgent ? " (agen depan)" : "");
+    const desc = document.createElement("p");
+    desc.textContent = agent.function.description;
+    const chips = document.createElement("div");
+    chips.className = "chips";
+    for (const ref of agent.tools) {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      if (actionNames.has(ref)) { chip.textContent = `aksi: ${ref}`; chip.classList.add("chip-action"); }
+      else if (peerNames.has(ref)) { chip.textContent = `peer: ${ref}`; chip.classList.add("chip-peer"); }
+      else { chip.textContent = `agen: ${ref}`; chip.classList.add("chip-agent"); }
+      chips.appendChild(chip);
+    }
+    card.append(title, desc, chips);
+    host.appendChild(card);
+  }
+}
+
+function renderPeers() {
+  const list = $("peer-list");
+  list.textContent = "";
+  for (const name of rt.peerRuntimes.keys()) {
+    const li = document.createElement("li");
+    li.textContent = `Jaringan peer dimuat: ${name}`;
+    list.appendChild(li);
+  }
+  $("peer-status").textContent = rt.peerRuntimes.size
+    ? `${rt.peerRuntimes.size} jaringan peer aktif di browser ini.`
+    : "Belum ada jaringan peer yang dimuat.";
+}
+
+async function handleTurn(text) {
+  if (busy || !rt) return;
+  busy = true;
+  chatStatus.textContent = "Pelayan sedang bekerja…";
+  addMessage(text, "user");
+  try {
+    const result = await rt.ask(text);
+    if (result.needsConfirmation) {
+      pendingConfirmation = result.needsConfirmation;
+      addMessage(result.answer, "agent");
+      const ok = await askConfirm(result.answer);
+      if (ok) {
+        const out = await rt.executeAction(pendingConfirmation.tool, pendingConfirmation.args, { preApproved: true });
+        addMessage(formatAnswer(pendingConfirmation.tool, out), out.ok ? "agent" : "error");
+      } else {
+        addMessage("Dibatalkan — tidak ada yang berubah.", "agent");
+      }
+      pendingConfirmation = null;
+    } else {
+      addMessage(result.answer, "agent");
+    }
+  } catch (e) {
+    addMessage(`Maaf, terjadi kesalahan: ${e.message}`, "error");
+  } finally {
+    refreshLedger();
+    renderPeers();
+    chatStatus.textContent = "";
+    busy = false;
+  }
+}
+
+async function init() {
+  refreshLedger();
+  try {
+    rt = new AgenticRuntime({
+      confirm: async ({ action, args, summary }) => askConfirm(
+        `Aksi tulis ${action} akan dijalankan.\n${summary}\n\nLanjutkan?`,
+      ),
+      manifestUrl: "agents/agent-manifest.json",
+      onConsent: askConsent,
+      onTrace: addTrace,
+      store,
+    });
+    await rt.init();
+    await rt.loadLinks();
+    renderNetwork();
+    applyByokToUi(); // sinkronkan kunci BYOK tersimpan ke runtime yang baru dibuat
+    const peerUrl = rt.peerUrlFor("gudang");
+    if (peerUrl) $("peer-url").value = peerUrl;
+    $("conformance-status").textContent =
+      `Sesuai: manifest + jaringan ${rt.manifest.networks[0].name} (${rt.network.tools.length} agen) ` +
+      `dan links.json lolos validasi. Profil ${rt.manifest.profile}.`;
+    addMessage(
+      "Halo! Saya Pelayan, agen warung ini. Tanya harga, stok, promo, atau laporan — " +
+      "atau coba tombol contoh di bawah. Semua berjalan di browser, tanpa server.",
+      "agent",
+    );
+  } catch (e) {
+    $("conformance-status").textContent = `Gagal memuat: ${e.message}`;
+    $("network-graph").textContent = `Gagal memuat jaringan: ${e.message}`;
+    addMessage(
+      `Situs ini butuh disajikan lewat HTTP(S) — buka lewat server lokal (node tools/serve.mjs) ` +
+      `atau hosting. Detail: ${e.message}`,
+      "error",
+    );
+  }
+}
+
+$("chat-form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const input = $("chat-input");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  handleTurn(text);
+});
+
+document.querySelectorAll("[data-example]").forEach((btn) => {
+  btn.addEventListener("click", () => handleTurn(btn.dataset.example));
+});
+
+$("reset-data").addEventListener("click", () => {
+  store.reset();
+  refreshLedger();
+  addMessage("Data demo direset ke inventaris awal.", "agent");
+});
+
+$("trace-clear").addEventListener("click", () => {
+  traceEl.textContent = "";
+  if (rt) rt.trace = [];
+});
+
+// Router & BYOK
+const BYOK_KEY = "warung-agent-byok-v1";
+function loadByok() {
+  try {
+    const raw = localStorage.getItem(BYOK_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.key === "string" && parsed.key) return parsed;
+  } catch { /* abaikan */ }
+  return null;
+}
+function applyByokToUi() {
+  const saved = loadByok();
+  if (saved) {
+    $("byok-base-url").value = saved.baseUrl || "https://api.openai.com/v1";
+    $("byok-model").value = saved.model || "gpt-4o-mini";
+    $("byok-key").value = saved.key;
+    if (rt) rt.byok = { baseUrl: saved.baseUrl, key: saved.key, model: saved.model };
+    $("router-status").textContent = "Router: BYOK (kunci tersimpan di browser ini).";
+  } else {
+    if (rt) rt.byok = null;
+    $("router-status").textContent = "Router: lokal deterministik.";
+  }
+}
+document.querySelectorAll('input[name="router-mode"]').forEach((radio) => {
+  radio.addEventListener("change", () => {
+    const mode = document.querySelector('input[name="router-mode"]:checked').value;
+    if (rt) rt.routerMode = mode;
+    $("byok-fields").hidden = mode !== "byok";
+    if (mode === "byok") {
+      applyByokToUi();
+      if (!loadByok()) $("router-status").textContent = "Router: BYOK — isi dan simpan kunci dulu.";
+    } else {
+      $("router-status").textContent = "Router: lokal deterministik.";
+    }
+  });
+});
+$("byok-save").addEventListener("click", () => {
+  const baseUrl = $("byok-base-url").value.trim();
+  const model = $("byok-model").value.trim() || "gpt-4o-mini";
+  const key = $("byok-key").value;
+  if (!key) { $("router-status").textContent = "Kunci masih kosong."; return; }
+  try { localStorage.setItem(BYOK_KEY, JSON.stringify({ baseUrl, key, model })); } catch { /* abaikan */ }
+  if (rt) rt.byok = { baseUrl, key, model };
+  $("router-status").textContent = "Router: BYOK (kunci tersimpan di browser ini).";
+});
+$("byok-delete").addEventListener("click", () => {
+  try { localStorage.removeItem(BYOK_KEY); } catch { /* abaikan */ }
+  $("byok-key").value = "";
+  if (rt) rt.byok = null;
+  $("router-status").textContent = "Kunci BYOK dihapus. Router: lokal deterministik.";
+});
+
+// Peer
+$("peer-load").addEventListener("click", async () => {
+  if (!rt) return;
+  const url = $("peer-url").value.trim();
+  if (!url) { $("peer-status").textContent = "Isi dulu URL jaringan peer."; return; }
+  $("peer-status").textContent = "Memuat jaringan peer…";
+  try {
+    await rt.loadPeer(url, "memuat jaringan peer atas permintaan pengguna");
+    renderPeers();
+    addMessage(`Jaringan peer dimuat dari ${url}. Coba tanyakan harga pemasok.`, "agent");
+  } catch (e) {
+    $("peer-status").textContent = `Gagal memuat peer: ${e.message}`;
+  }
+});
+
+applyByokToUi();
+init();
+</script>
+</body>
+</html>

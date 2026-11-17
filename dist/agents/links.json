@@ -1,0 +1,1 @@
+{"networks":{"warung":{"gudang":"../agents-peer/gudang"}},"note":"Peta tautan jaringan peer milik penerbit. Nilai berupa URL jaringan peer; nilai relatif diselesaikan terhadap URL manifest situs ini oleh runtime pemanggil.","version":1}
